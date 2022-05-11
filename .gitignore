@@ -1,0 +1,7 @@
+
+.ipynb_checkpoints/config_gitignore-checkpoint.py
+__pycache__/config_gitignore.cpython-39.pyc
+config_gitignore.py
+Data/hyperspectral-soilmoisture-dataset-v1.0.0.zip
+Data/soybean-prices-historical-chart-data.csv
+Data/wheat-prices-historical-chart-data.csv
