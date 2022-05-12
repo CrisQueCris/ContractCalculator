@@ -3,17 +3,17 @@ import functools
 from flask import(
     Blueprint, flash, g, redirect, render_template, request, session, url_for
 )
-from flaskcontr import get_db
+from flaskcontr.db import get_db
 
-bp = Blueprint('contract', __name__, url_prefix='/contract')
+bp = Blueprint('contract', __name__, url_prefix='/')
 
-@bp.route('/addcontr', methods=('GET', 'POST'))
+@bp.route('/', methods=('GET', 'POST'))
 def addcontr():
-    if addcontr.method == 'POST':
-        commodity = addcontr.form['commodity']
-        amount_tonnes = addcontr.form['amount_tonnes']
-        amount_euros = addcontr.form['amount_tonnes']
-        date_fullfillment = addcontr.form['date_fullfillment']
+    if request.method == 'POST':
+        commodity = request.form['commodity']
+        amount_tonnes = request.form['amount_tonnes']
+        amount_euros = request.form['amount_tonnes']
+        date_fullfillment = request.form['date_fullfillment']
         db = get_db()
         error= None
 
@@ -36,8 +36,8 @@ def addcontr():
             except db.IntegrityError:
                 error = "Couldn't add contract"
             else:
-                return redirect(url_for('index'))
+                return redirect(url_for('contract.addcontr'))
 
         flash(error)
 
-    return render_template('contract/addcontr.html')
+    return render_template('base.html')

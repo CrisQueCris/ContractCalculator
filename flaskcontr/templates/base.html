@@ -1,7 +1,97 @@
 <!DOCTYPE html>
-<title>{% block title%}{%endblock%} - Contract Symulator</title>
+<title>{% block title %} {% endblock %}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+<header>Contract Simulator</header>
 <nav>
-    <h1>Contract Symulator</h1>
-    
+    <h1>Contract Simulator</h1>
+    <ul>
+
+
+    </ul>
 </nav> 
+<main>
+
+<section>
+
+</section>
+
+<section>
+Graph2
+
+
+</section>
+
+
+
+
+<section class="content">
+    <header>
+      {% block header %}{% endblock %}
+    </header>
+    {% for message in get_flashed_messages() %}
+      <div class="flash">{{ message }}</div>
+    {% endfor %}
+    {% block content %}
+    <form method="post">
+        <label for="commodity">Commodity</label>
+        <input name="commodity" id="commodity" required>
+        <label for="amount_tonnes"> Amount in to</label>
+        <input name="amount_tonnes" id="amount_tonnes" required>
+        <label for="amount_euros"> Amount in Euros/to</label>
+        <input name="amount_euros" id="amount_euros" required>
+        <label for="date_fullfillment">Date of fullfillment</label>
+        <input name="date_fullfillment" id="date_fullfillment">
+        <input type="submit" value="Add contract">
+    </form>
+    {% endblock %}
+  </section>
+  <section>
+    <table>
+        <caption>
+            Table of contracts:
+        </caption>
+       
+        <tc>
+            <th>
+                Commodity
+            </th>
+            <th>
+                Date added
+            </th>
+            <th>
+                Amount in to
+            </th>
+            <th>
+                Amount in Euros/to
+            </th>
+            <th>
+                date of fullfillment
+            </th>
+        </tc>
+        <tr>
+          
+        </tr>
+        <tr>
+            
+        </tr>
+        <tr>
+            
+        </tr>
+        <tr>
+            
+        </tr>
+    </table>
+   
+
+
+    
+</section>
+
+
+  <aside>
+    Add field:
+    
+    
+    </aside>
+</main>

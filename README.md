@@ -1,3 +1,33 @@
+How to start FLASK server:
+
+
+
+1. Start virtual environment contractenv
+    MAC: $ . contractenv/bin/activate
+    WIN: > contractenv\Scripts\activate
+
+
+2. Start Server:
+
+Bash: 
+$ export FLASK_APP=flaskcontr
+$ export FLASK_ENV=development
+$ flask run
+
+Powershell: 
+
+> $env:FLASK_APP = "flaskcontr"
+> $env:FLASK_ENV = "development"
+> flask run
+
+CMD: 
+ set FLASK_APP=flaskcontr
+ set FLASK_ENV=development
+ flask run
+
+
+
+About:
 # ContractCalculator
 Final project for Ironhack Bootcamp Fulltime March 2022
 

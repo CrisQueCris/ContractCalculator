@@ -23,15 +23,14 @@ def create_app(test_config=None):
         pass
 
 
-    @app.route('/hello')
-    def hello():
-        return 'Hello, World!'
-
-
     from . import db
     db.init_app(app)
 
-    from . import contract
-    app.register_blueprint(contract.bp)
+    from . import addcontr
+    app.register_blueprint(addcontr.bp)
+
+
+    from . import futureprice
+    futureprice.plot_wheatprice()
 
     return app
