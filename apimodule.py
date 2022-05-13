@@ -17,7 +17,7 @@ def get_historical_data(start_date, end_date, api_key):
 
 def json_to_sql(response):
     ''' json from get_hostorical_data() and parses sql into wheat_spotprice table'''
-    con = sqlite3.connect('price_data.db',timeout=10)
+    con = sqlite3.connect('contrcalc.db',timeout=10)
     cur = con.cursor()
     for date, price in response.json()['data']['rates'].items():
         price = 1/list(price.values())[0]        
@@ -32,9 +32,13 @@ def json_to_sql(response):
     return 
 
 def get_price_since_last_querry():    
-    con = sqlite3.connect('price_data.db')
+    con = sqlite3.connect('contrcalc.db')
     cur = con.cursor()
-    for i in  con.execute('Select MAX(date) FROM wheat_spotprice'):
+    for i in  con.execute('''
+    Select MAX(date_price) FROM price_table
+        JOIN 
+        WHERE commodity_id = 
+    ''''):
         last_date = i[0]
     con.commit()  
     con.close()
