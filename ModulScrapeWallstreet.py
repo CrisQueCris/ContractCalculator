@@ -41,22 +41,6 @@ def scrape_futureprice():
 
 
 
-def future_price_to_sql(future_price_today):
-    con = sqlite3.connect('contrcalc.db')
-    cur = con.cursor()
-    for i in range(0, len(future_price_today)):
-        cur.execute("""
-        INSERT INTO price_table (
-        commodity_id, date_fullfillment, date_price, price, currency) 
-        VALUES (?,?,?,?,?)   
-        """,
-                   (future_price_today.iloc[i, 7],\
-                    future_price_today.iloc[i, 4],\
-                    future_price_today.iloc[i, 5],\
-                    future_price_today.iloc[i, 1],\
-                    future_price_today.iloc[i, 6])
-                   )
-    con.commit()
-    return
+
 
     

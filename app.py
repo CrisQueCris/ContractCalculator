@@ -2,6 +2,9 @@ from dash import Dash, dcc, html, dash_table
 from dash.dependencies import Input, Output, State
 import pandas as pd
 from datetime import date, timedelta
+import sqlite3
+
+
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -9,7 +12,12 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 future_df = pd.read_csv('Data/future_df.csv')
 
 #load table with contracts
-contracts_df = pd.read_csv('Data/future_df.csv') 
+contracts_df = pd.read_csv('Data/contracts_df.csv') 
+
+
+#load table with commodities
+con = sqlite3.connect('contrcalc.db')
+commodities_df = pd.read_sql("Select * from commodities", con, index_col='commodity_id')
 
 app = Dash(__name__, external_stylesheets=external_stylesheets)
 
@@ -61,14 +69,14 @@ app.layout = html.Div([
     end_date_placeholder_text='Select a date!'
     ),
     
-    
+    ]),
     #Table showing contracts
  
     dash_table.DataTable(
     contracts_df.to_dict('records'),
     [{"name": i, "id": i} for i in contracts_df.columns]
-    )
-    ]),    
+    ),
+        
         
         
         
@@ -88,7 +96,7 @@ app.layout = html.Div([
                     ]),
                 html.Tbody([
                     html.Tr([
-                        html.Td(dcc.Dropdown(['wheat', 'barley', 'corn', 'rapeseed'], 'wheat', id='commodity-dropdown')),
+                        html.Td([dcc.Dropdown([com for com in commodities_df['name']], commodities_df['name'][2], id='commodity-dropdown')]),
                         html.Td([dcc.Input(id='input-price', type="number", value='80')]),
                         html.Td([dcc.Input(id='input-amount', type="number", value='300')]),
                         html.Td([dcc.DatePickerSingle(
@@ -105,8 +113,8 @@ app.layout = html.Div([
                                     max_date_allowed=date.today() + timedelta(days=365*5),
                                     
                                     date=date.today() + timedelta(days=365/2)
-                                )]),
-                        ])
+                                )])
+                        
                     ])     
         
                 ]),
@@ -114,11 +122,16 @@ app.layout = html.Div([
             html.Button('enter-contract', n_clicks=0, id='button-enter-contract-state'),
             html.Div(id='output-container-button',
                  children='Press to add contract')
-        ])
+            ]),
     
     #Menu to enter prospected harvest
+        dash_table.DataTable(
+        commodities_df.to_dict('records'),
+        [{"name": i, "id": i} for i in commodities_df.columns]
+        )
    
-    ])    
+    ])
+])
             
 #Callbacks
 
@@ -128,8 +141,10 @@ app.layout = html.Div([
              Input('commodities-tab', 'value'))
 def render_commodity(tab):
     return tab
-            
-            
+
+
+#Adding Contract
+           
 @app.callback(Output('output-container-button', 'children'),
             Input('button-enter-contract-state', 'n_clicks'),
               State('commodity-dropdown', 'value'),
@@ -139,10 +154,15 @@ def render_commodity(tab):
               State('input-date_contract', 'date')
              )
 def add_contract(n_clicks, commodity, price, amount, date_fullfillment, date_contract):
-    output_text = f'The contract has been saved, Button clicked: {n_clicks}'
+    global contracts_df
+    output_text = f'Contracts saved: {n_clicks}'
     
-    contract = pd.DataFrame({'commodity': commodity, 'price': price, 'amount': amount, 'date_fullfillment':date_fullfillment, 'date_contract':date_contract}, index=[0])
-    contract.to_csv('Data/contract.csv')
+    commodity_id = commodities_df[commodities_df['name']==commodity].index
+    contract = pd.DataFrame({'commodity_id': commodity_id, 'price_per_to': price, 'amount_to': amount, 'date_fullfillment':date_fullfillment, 'date_closure':date_contract}, index=[0])
+    contracts_df = pd.concat([contracts_df, contract], axis = 0)
+    contract.to_csv('Data/contracts_df.csv')
+    con = sqlite3.connect('contrcalc.db')
+    contract.to_sql('contracts', con, if_exists='append', index=False)
     return output_text
     
 
