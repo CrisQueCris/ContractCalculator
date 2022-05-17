@@ -41,7 +41,7 @@ def scrape_futureprice():
 
 
 
-def future_price_to_sql(future_pricetoday):
+def future_price_to_sql(future_price_today):
     con = sqlite3.connect('contrcalc.db')
     cur = con.cursor()
     for i in range(0, len(future_price_today)):
