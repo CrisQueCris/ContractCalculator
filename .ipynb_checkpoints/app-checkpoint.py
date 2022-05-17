@@ -3,21 +3,29 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 from datetime import date, timedelta
 import sqlite3
+import plotly.graph_objects as go
 
 
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 #load table with price data
-future_df = pd.read_csv('Data/future_df.csv')
+
+con = sqlite3.connect('contrcalc.db') 
+price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
+
+
 
 #load table with contracts
-contracts_df = pd.read_csv('Data/contracts_df.csv') 
+contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contract_id')
 
 
 #load table with commodities
-con = sqlite3.connect('contrcalc.db')
+
 commodities_df = pd.read_sql("Select * from commodities", con, index_col='commodity_id')
+
+
+
 
 app = Dash(__name__, external_stylesheets=external_stylesheets)
 
@@ -33,43 +41,33 @@ app.layout = html.Div([
     
     #Tabs that display the different contracts and commodities
     dcc.Tabs(id="commodities-tab", value='wheat_tab_val', children=[ 
-        dcc.Tab(label='wheat', value='wheat-tab-val'),
-        dcc.Tab(label='barley', value='barley-tab-val'),
+        dcc.Tab(label='wheat'),
+        dcc.Tab(label='barley'),
         dcc.Tab(label='corn', value='corn-tab-val'),
         dcc.Tab(label='rapeseed', value='rapeseed-tab-val'),
         ]),
-    html.Div(id='tabs-content', children=[
+    html.Div(id='tabs-content', children=[]),
     #Dropdown to select the respective Futuresprice
-    dcc.Dropdown(
-    ['Spotprice', 'May 2022', 'June 2022', 'July 2022', 'August 2022', 'September 2022'],
-    ['Spotprice', 'September 2022'],
-    multi=True
-    ),    
+        dcc.Dropdown([datefull for datefull in price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()], price_df[price_df['commodity_id']==2]['date_fullfillment'].max(), id='date_fulllfillment-dropdown',
+        multi=True
+        ),              
     #Graph showing contracted amount
-    dcc.Graph(
-                figure={
-                    'data': [{
-                        'x': [1, 2, 3],
-                        'y': [3, 1, 2],
-                        'type': 'bar'
-                    }]
-                }
-            ),            
+        dcc.Graph(id='price_dev'),            
     #Graph showing commodity price        
     
     
     
     #Slider to adapt time
-    dcc.RangeSlider(-5, 10, 1, count=1, value=[-3, 7]),
+        dcc.RangeSlider(-5, 10, 1, count=1, value=[-3, 7]),
     
     #DatePickerRange to adapt RangSlider
-    dcc.DatePickerRange(
-    id='date-picker-range',
-    start_date=date(1997, 5, 3),
-    end_date_placeholder_text='Select a date!'
-    ),
+        dcc.DatePickerRange(
+        id='date-picker-range',
+        start_date=date(1997, 5, 3),
+        end_date_placeholder_text='Select a date!'
+        ),
     
-    ]),
+    
     #Table showing contracts
  
     dash_table.DataTable(
@@ -160,11 +158,22 @@ def add_contract(n_clicks, commodity, price, amount, date_fullfillment, date_con
     commodity_id = commodities_df[commodities_df['name']==commodity].index
     contract = pd.DataFrame({'commodity_id': commodity_id, 'price_per_to': price, 'amount_to': amount, 'date_fullfillment':date_fullfillment, 'date_closure':date_contract}, index=[0])
     contracts_df = pd.concat([contracts_df, contract], axis = 0)
-    contract.to_csv('Data/contracts_df.csv')
+    
+    
     con = sqlite3.connect('contrcalc.db')
     contract.to_sql('contracts', con, if_exists='append', index=False)
     return output_text
-    
+
+#Display only price data that was selected in Dropdown
+@app.callback(Output('price_dev', 'figure'),
+             Input('date_fulllfillment-dropdown', 'value'))
+def display_price(dates_ff):
+    print(dates_ff)
+    fig = go.Figure([go.Scatter(x=price_df[price_df['date_fullfillment'].isin([dates_ff])]['date_price'], y=price_df['price'], color=price_df['date_fullfillment'])])
+    return fig
+
+
+
 
 
 if __name__ == '__main__':
