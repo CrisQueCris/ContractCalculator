@@ -20,13 +20,13 @@ price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
 
 
 #load table with contracts
-
+contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contract_id',  parse_dates=['date_closure', 'date_fullfillment'])
 
 
 #load table with commodities
 
 commodities_df = pd.read_sql("Select * from commodities", con, index_col='commodity_id')
-contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contract_id',  parse_dates=['date_closure', 'date_fullfillment'])
+
 
 
 
@@ -54,6 +54,20 @@ app.layout = html.Div([
         dcc.Tab(label='rapeseed', value='rapeseed-tab-val'),
         ]),
     html.Div(id='tabs-content', children=[]),
+        html.Div(
+    [
+        dcc.Input(
+            id="input_hectar_wheat",
+            type='number',
+            placeholder='Area planted (ha)'
+        ),
+        dcc.Input(
+            id="input_ertrag_per_ha_wheat",
+            type='number',
+            placeholder='Expected harvest (to/ha)'
+        )
+    ]
+    ),
     #Dropdown to select the respective Futuresprice
         dcc.Dropdown([datefull for datefull in price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()], price_df[price_df['commodity_id']==2]['date_fullfillment'].unique(), id='date_fulllfillment-dropdown',
         multi=True
