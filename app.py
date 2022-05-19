@@ -304,6 +304,7 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
     #scrape button    
     elif button_id == 'button-scrape_data':
         price_df = pd.read_json(price_df_json, orient = 'split')
+        
         commodities_df = pd.read_json(commodities_df_json, orient = 'split')
         contracts_df = pd.read_json(contracts_df_json, orient = 'split')
         print("Attempt to scrape future price data.")
@@ -316,8 +317,15 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
         except:
             print("Failed to scrape Wallstreet")
         try:
+            price_df['date_fullfillment']= pd.to_datetime(price_df['date_fullfillment'], format='%Y/%m/%d %H:%M:%S').dt.date
+            price_df['date_price']= pd.to_datetime(price_df['date_price'], format='%Y/%m/%d %H:%M:%S').dt.date
+            future_df_clean['date_fullfillment']=future_df_clean['date_fullfillment'].dt.date
+            future_df_clean['date_price']=future_df_clean['date_price'].dt.date
+            print(price_df, future_df_clean)
             price_df = pd.concat([price_df, future_df_clean], axis=0)
+            print(price_df)
             price_df.drop_duplicates(keep= 'first', inplace=True)
+            print(price_df)
             price_df_json = price_df.to_json(date_format='iso', orient='split')
             print(price_df, future_df_clean)
             print(f'Successfully added scraped data to price_df')
