@@ -14,18 +14,18 @@ colorscales = px.colors.named_colorscales()
 
 #load table with price data
 
-con = sqlite3.connect('contrcalc.db') 
-price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
+#con = sqlite3.connect('contrcalc.db') 
+#price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
 
 
 
 #load table with contracts
-contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contract_id',  parse_dates=['date_closure', 'date_fullfillment'])
+#contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contract_id',  parse_dates=['date_closure', 'date_fullfillment'])
 
 
 #load table with commodities
 
-commodities_df = pd.read_sql("Select * from commodities", con, index_col='commodity_id')
+#commodities_df = pd.read_sql("Select * from commodities", con, index_col='commodity_id')
 
 
 
@@ -41,6 +41,7 @@ app.layout = html.Div([
     html.H1('Contract Simulator'),
     #Load Button
     html.Button('Load Data', n_clicks=0, id='button-load_data'),
+    html.Div(id='output-load_data'),
     html.Button('Load todays prices', n_clicks=0, id='button-scrape_data'),
     html.Div(id='output-scraped_data'),
         
@@ -53,25 +54,33 @@ app.layout = html.Div([
         dcc.Tab(label='corn', value='corn-tab-val'),
         dcc.Tab(label='rapeseed', value='rapeseed-tab-val'),
         ]),
-    html.Div(id='tabs-content', children=[]),
+    
+        # Div with all content of one grain, so far only placeholder
+        html.Div(id='tabs-content', children=[]),
         html.Div(
-    [
-        dcc.Input(
-            id="input_hectar_wheat",
-            type='number',
-            placeholder='Area planted (ha)'
-        ),
-        dcc.Input(
-            id="input_ertrag_per_ha_wheat",
-            type='number',
-            placeholder='Expected harvest (to/ha)'
-        )
+    [#input for area planted
+        html.Div( 
+                 ["Area planted in ha", 
+                  dcc.Input(
+                    id="input_hectar_wheat",
+                    type='number',
+                    placeholder='Area planted (ha)'
+                    ),
+                  html.Div(id='output_hectar_wheat')]),
+      #input for amount harvested
+         html.Div(       
+                ["Expected harvest in to/ha", 
+                 dcc.Input(
+                    id="input_harvest_per_ha_wheat",
+                    type='number',
+                    placeholder='Expected harvest (to/ha)'
+                ),
+                html.Div(id='output_to_per_hectar_wheat')])
     ]
     ),
     #Dropdown to select the respective Futuresprice
-        dcc.Dropdown([datefull for datefull in price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()], price_df[price_df['commodity_id']==2]['date_fullfillment'].unique(), id='date_fulllfillment-dropdown',
-        multi=True
-        ),              
+        html.Div(id="select_future_dropdown"),
+                      
     #Graph showing contracted amount
         dcc.Graph(id='price_dev'),            
     #Graph showing commodity price        
@@ -112,7 +121,7 @@ app.layout = html.Div([
                 html.Tbody([
                     html.Tr([html.H4('Add a contract')]),
                     html.Tr([
-                        html.Td([dcc.Dropdown([com for com in commodities_df['name']], commodities_df['name'][2], id='commodity-dropdown')]),
+                        html.Td([dcc.Dropdown(id='commodity-dropdown')]),
                         html.Td([dcc.Input(id='input-price', type="number", value='')]), 
                         html.Td([dcc.Input(id='input-amount', type="number", value='300')]), 
                         html.Td([dcc.DatePickerSingle(
@@ -142,7 +151,7 @@ app.layout = html.Div([
                     html.Tr([html.H4('Delete a contract')]),
                     html.Tr([
                         
-                        html.Td([dcc.Dropdown([com for com in commodities_df['name']], commodities_df['name'][2], id='commodity-dropdown-delete')]),
+                        html.Td([dcc.Dropdown(id='commodity-dropdown-delete')]),
                         html.Td([dcc.Input(id='input-price-delete', type="number", value='')]), 
                         html.Td([dcc.Input(id='input-amount-delete', type="number", value='300')]), 
                         html.Td([dcc.DatePickerSingle(
@@ -175,22 +184,22 @@ app.layout = html.Div([
             
              #Table showing contracts
  
-    dash_table.DataTable(
-    contracts_df.to_dict('records'),
-    [{"name": i, "id": i} for i in contracts_df.columns]
-    ),
+    # '''dash_table.DataTable(
+    # contracts_df.to_dict('records'),
+    # [{"name": i, "id": i} for i in contracts_df.columns]
+    # ),'''
             
             
             
     #Menu to enter prospected harvest
-        dash_table.DataTable(
-        commodities_df.to_dict('records'),
-        [{"name": i, "id": i} for i in commodities_df.columns]
-        ),
-             dash_table.DataTable(
-        price_df.to_dict('records'),
-        [{"name": i, "id": i} for i in commodities_df.columns]
-        )
+        # dash_table.DataTable(
+        # commodities_df.to_dict('records'),
+        # [{"name": i, "id": i} for i in commodities_df.columns]
+        # ),
+        #      dash_table.DataTable(
+        # price_df.to_dict('records'),
+        # [{"name": i, "id": i} for i in commodities_df.columns]
+        # )
    
     ])
         ], id='main_div'),
@@ -213,9 +222,11 @@ app.layout = html.Div([
 
 #Button load data
 
-@app.callback(Output('main_div', 'children'),
+@app.callback(Output('output-load_data', 'children'),
+              Output('commodity-dropdown', 'options'),
+              Output('commodity-dropdown-delete', 'options'),
     Input('button-load_data', 'n_clicks'))
-def load_data(n_clicks):
+def load_data():
     global commodities_df, contracts_df, price_df
     print('Attempt to load commodites_df, contracts_df and price_df from sql database') 
     try:
@@ -223,10 +234,20 @@ def load_data(n_clicks):
         commodities_df = pd.read_sql("Select * from commodities", con, index_col='commodity_id')
         contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contract_id',  parse_dates=['date_closure', 'date_fullfillment'])
         price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
-        print('reloaded data: commodities_df, contracts_df, price_df')
+        output_message = 'reloaded data: commodities_df, contracts_df, price_df'
     except:
         print("Error: couldn't reload data from database")
-    return commodities_df, contracts_df, price_df
+        
+    com_list = [com for com in commodities_df['name']]
+    return output_message, com_list
+
+
+
+
+
+
+
+
 
 #Button load todays prices:
 
@@ -244,7 +265,9 @@ def scrape_data(n_clicks):
         print(f'Successfully parsed data to database price_table. Parsed data: {tosql_df}')
     except: 
         print('Error: Could not parse data to database price_table')
-    return #future_price_today
+    finally:
+        output_message = "Scraped Price data successfully"
+    return output_message
 
 
 # Changing tab:
@@ -264,6 +287,64 @@ def scrape_data(n_clicks):
 #    #start_data =int(start_date)
 #    #end_date = datetime.strptime(end_date, '%Y-%m-%d')
 #    return start_date, end_date
+
+
+
+# save expected harvest 
+@app.callback(
+              Output('output_hectar_wheat', 'children'),
+                Output('output_to_per_hectar_wheat', "children"),
+             Input("input_hectar_wheat", "value"), 
+              Input("input_harvest_per_ha_wheat", "value")
+             )
+def save_expected_harvest(harvest_area, harvest_tph):
+    harvest_list=(harvest_tph, harvest_area,)
+    querry=("""
+    UPDATE commodities
+    SET 
+        estimate_harvest_to = ?,
+        area_planted = ?
+    WHERE
+        commodity_id = 2;
+    """) 
+    try:
+        con = sqlite3.connect('contrcalc.db')
+        print("Connected to SQLite")
+        cur = con.cursor()
+        cur.execute(querry, harvest_list)
+        con.commit()
+        print("Total", cur.rowcount, "Records inserted successfully into SqliteDb_developers table")
+        con.commit()
+        cur.close()
+        output_hectar_wheat = f'Saved to database: {harvest_area} ha'
+        output_to_wheat = f'Saved to database: {harvest_tph} to/ha'
+    except sqlite3.Error as error:
+            print("Failed to insert multiple records into sqlite table", error)
+            output_hectar_wheat = "not saved"
+            output_to_wheat = "not saved"
+    finally:
+        if (con):
+            con.close()
+            print("The SQLite connection is closed")
+    return output_hectar_wheat, output_to_wheat
+
+
+#toggle tropdown to select futures:
+@app.callback(Output('date_fullfillment-dropdown', 'options'),
+             Input())
+def toggle_futures_dropdown():
+    price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
+    dcc.Dropdown([datefull for datefull in price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()], price_df[price_df['commodity_id']==2]['date_fullfillment'].unique(), id='date_fulllfillment-dropdown',
+            multi=True
+            )
+    return
+
+
+
+
+
+
+
 
 
 #Delete Contract
@@ -342,14 +423,14 @@ def add_contract(n_clicks, commodity, price, amount, date_fullfillment, date_con
         if price:
             con = sqlite3.connect('contrcalc.db')
             contract.to_sql('contracts', con, if_exists='append', index=False)
-            print(f'Contract saved: n_clicks:{n_clicks}, commodity:{commodity}, price:{price}, amount:{amount}, date_fullfillment:{date_fullfillment}, date_contract:{date_contract}')
+            output_message = f'Contract saved: n_clicks:{n_clicks}, commodity:{commodity}, price:{price}, amount:{amount}, date_fullfillment:{date_fullfillment}, date_contract:{date_contract}'
         else:
-            print('No contract added because, price is empty.')
+            output_message = 'No contract added because, price is empty.'
             pass
     except:
-        print('Failed to send the dataframe to the database')
+        output_message = 'Failed to send the dataframe to the database'
     
-    return
+    return output_message
 
 
 
@@ -358,8 +439,10 @@ def add_contract(n_clicks, commodity, price, amount, date_fullfillment, date_con
 
 #Display only price data that was selected in Dropdown
 @app.callback(Output('price_dev', 'figure'),
-             Input('date_fulllfillment-dropdown', 'value'))
-def display_price(dates_ff):
+             Input('date_fulllfillment-dropdown', 'value'),
+             Input("input_hectar_wheat", "value"), 
+              Input("input_harvest_per_ha_wheat", "value"))
+def display_price(dates_ff, harvest_area, harvest_tph):
     print('Adding Data to Figure')
     #print(price_df['price'])
     print(price_df['date_fullfillment'])
@@ -378,7 +461,7 @@ def display_price(dates_ff):
             #print(f'selected futures: {selected_futures}')
             day_of_price_of_selected_futures = price_df[price_df['date_fullfillment']==future]['date_price']
             price_of_selected_futures= price_df['price']
-            fig.add_trace(go.Scatter(x=day_of_price_of_selected_futures, y=price_of_selected_futures, name=future))
+            fig.add_trace(go.Scatter(x=day_of_price_of_selected_futures, y=price_of_selected_futures, name=future, mode='lines+markers'))
             fig.update_traces(marker=dict(colorscale='Agsunset'))
             print('Added future to figure')
         except:
@@ -398,15 +481,45 @@ def display_price(dates_ff):
     except:
         print('Failed to add dates_of_closed_contract and price_per_to_of_closed_contractst to figure')
         
-        
-        
-        
-        
+   
+    
+    
+    
+    
+    #add column total harvest
+    commodities_df['total_harvest']= commodities_df['estimate_harvest_to']*commodities_df['area_planted']
+    
+    #add next_harvest_date as daytetime 
+    commodities_df['next_harvest_date'] = [datetime.strptime(f'2022/{month}/01', "%Y/%m/%d") for month in commodities_df['harvest_month']]
+    print(commodities_df)
+    
+    
+    #Add contracted amount in to as barplot
+    fig.add_trace(go.Bar( name='contracted amount', x=contracts_df["date_fullfillment"],
+             y=contracts_df["price_per_to"], width=100))    
+    
+    
+    #Add expected harvest barplot
+    fig.add_trace(go.Bar(x=commodities_df[commodities_df.index==2]['next_harvest_date'],
+             y=commodities_df['total_harvest'], name='expected harvest', width=200))
+    
+    
+    
+    
+    
+    
+    
+    #Add marker styling 
     fig.update_traces(marker=dict(size=10,
                               line=dict(width=2,
                                         color='DarkSlateGrey')),
                   selector=dict(mode='markers'))
+    
+    #Add title
     fig.update_layout(title_text="Wheat Future prices")
+    
+    
+    #Add boxes to select time frame
     fig.update_layout(
     xaxis=dict(
         rangeselector=dict(
@@ -430,6 +543,7 @@ def display_price(dates_ff):
                 dict(step="all")
             ])
         ),
+        #Ad rangeslider to filter timeframe
         rangeslider=dict(
             visible=True
         ),
