@@ -79,7 +79,10 @@ app.layout = html.Div([
     ]
     ),
     #Dropdown to select the respective Futuresprice
-        html.Div(id="select_future_dropdown"),
+        html.Div([dcc.Dropdown(id='date_fullfillment-dropdown',
+            multi=True
+            )],
+                 id="select_future_dropdown"),
                       
     #Graph showing contracted amount
         dcc.Graph(id='price_dev'),            
@@ -225,6 +228,7 @@ app.layout = html.Div([
 @app.callback(Output('output-load_data', 'children'),
               Output('commodity-dropdown', 'options'),
               Output('commodity-dropdown-delete', 'options'),
+              Output('future_dropdown_send', 'data'),
     Input('button-load_data', 'n_clicks'))
 def load_data():
     global commodities_df, contracts_df, price_df
@@ -239,7 +243,7 @@ def load_data():
         print("Error: couldn't reload data from database")
         
     com_list = [com for com in commodities_df['name']]
-    return output_message, com_list
+    return output_message, com_list, com_list, json.dumps(price_df)
 
 
 
@@ -329,15 +333,18 @@ def save_expected_harvest(harvest_area, harvest_tph):
     return output_hectar_wheat, output_to_wheat
 
 
+
+
+
 #toggle tropdown to select futures:
 @app.callback(Output('date_fullfillment-dropdown', 'options'),
-             Input())
-def toggle_futures_dropdown():
-    price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
-    dcc.Dropdown([datefull for datefull in price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()], price_df[price_df['commodity_id']==2]['date_fullfillment'].unique(), id='date_fulllfillment-dropdown',
-            multi=True
-            )
-    return
+              Output('date_fullfillment-dropdown', 'value'),
+             Input('future_dropdown_send', 'data'))
+def toggle_futures_dropdown(json_price_df):
+    price_df = json.loads(json_price_df)
+    fullfillment_options = [datefull for datefull in price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()]
+    fullfillment_value = price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()
+    return fullfillment_dates, fullfillment_value
 
 
 
