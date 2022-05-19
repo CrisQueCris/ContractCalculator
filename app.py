@@ -8,6 +8,7 @@ import plotly.express as px
 from ModulScrapeWallstreet import scrape_futureprice, future_price_to_sql, extrapolate_data
 import json
 from modules_app import *
+from plotly.subplots import make_subplots
 
 
 
@@ -130,7 +131,7 @@ app.layout = html.Div([
                     html.Tr([html.H4('Add a contract')]),
                     html.Tr([
                         html.Td([dcc.Dropdown(id='commodity-dropdown-enter')]),
-                        html.Td([dcc.Input(id='input-price-enter', type="number", value='')]), 
+                        html.Td([dcc.Input(id='input-price-enter', type="number", value='0')]), 
                         html.Td([dcc.Input(id='input-amount-enter', type="number", value='300')]), 
                          html.Td([dcc.DatePickerSingle(
                                     id='input-date_contract-enter',
@@ -161,7 +162,7 @@ app.layout = html.Div([
                     html.Tr([
                         
                         html.Td([dcc.Dropdown(id='commodity-dropdown-delete')]),
-                        html.Td([dcc.Input(id='input-price-delete', type="number", value='')]), 
+                        html.Td([dcc.Input(id='input-price-delete', type="number", value='0')]), 
                         html.Td([dcc.Input(id='input-amount-delete', type="number", value='300')]), 
                         
                             
@@ -335,7 +336,8 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
             print('Connecting to Database to save')
             con = sqlite3.connect('contrcalc.db')
             print('connected to db')
-            contracts_df.to_sql('contracts', con, if_exists='replace', index_label='contracts_id')
+            print(contracts_df)
+            contracts_df.to_sql('contracts', con, if_exists='replace', index=False, index_label='contract_id')
             print('contracts_df stored to db')
             price_df.to_sql('price_table', con, if_exists='replace', index_label='price_id')
             print('price_df stored to db')
@@ -362,8 +364,8 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
             print('Attempt to add contract', commodity_entered)
             contract_commodity_id = commodities_df[commodities_df['name']==commodity_entered].index  #The id of the commodity that the is the subject of the contract  
 
-
-            contract = pd.DataFrame({'commodity_id': contract_commodity_id, 'price_per_to': price_entered, 'amount_to': amount_entered, 'date_fullfillment':date_fullfillment_entered, 'date_closure':date_contract_entered}, index=[0])
+            contract_id = len(contracts_df) +1
+            contract = pd.DataFrame({'contract_id':contract_id, 'commodity_id': contract_commodity_id, 'price_per_to': price_entered, 'amount_to': amount_entered, 'date_fullfillment':date_fullfillment_entered, 'date_closure':date_contract_entered}, index=[0])
             contracts_df = pd.concat([contracts_df, contract], axis = 0)
             contracts_df_json = contracts_df.to_json(date_format='iso', orient='split')
             output_message_enter = 'Contract added. Click save to add to database'
@@ -384,16 +386,27 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
         if not commodity_del or not price_del or not amount_del or not date_fullfillment_del or not date_contract_del:
             output_message_del = 'Define all features to delete contract'
         else:     
-            contract_commodity_id_del = commodities_df[commodities_df['name']==commodity_del].index  #The id of the commodity that is the subject of the contract  
-
-            contract_to_delet = contracts_df[contracts_df['commodity_id']== contract_commodity_id_del and\
-                                             contracts_df['price_per_to']== price_del and\
-                                             contracts_df['amount_to']== amount_del and\
-                                             contracts_df['date_fullfillment']==date_fullfillment_del and\
-                                                 contracts_df['date_closure']==date_contract_del]
-                
-            contracts_df = contracts_df.drop()
-            output_message_del = f'Removed {contract_to_delte}, click save to save changes on database'
+            print(commodity_del)
+            if commodity_del == 'wheat':
+                contract_commodity_id_del = 2
+            amount_del = int(amount_del)
+            print(contracts_df)
+            print(f'check input: {contract_commodity_id_del}, {type(price_del), price_del}, {type(amount_del), amount_del}, {date_fullfillment_del}, {date_contract_del} ')
+                      
+            print(contracts_df['commodity_id']== contract_commodity_id_del)
+            print(contracts_df['price_per_to']== price_del)
+            print(contracts_df['amount_to']== amount_del)
+            print(contracts_df['date_fullfillment']==date_fullfillment_del)
+            print(contracts_df['date_closure']==date_contract_del)
+            
+            
+            
+            contract_to_del = contracts_df[contracts_df['date_fullfillment']==date_fullfillment_del] 
+            print(contract_to_del)    
+            contracts_df = contracts_df.drop(contract_to_del.index)
+            contracts_df_json= contracts_df.to_json(date_format='iso', orient='split')
+            print(contracts_df)
+            output_message_del = f'Removed {contract_to_del}, click save to save changes on database'
             print(output_message_del)
     else:
         #updates from area planted and expected harvest in to/ha
@@ -528,7 +541,7 @@ def display_price(dates_ff, harvest_area, harvest_tph, price_df_json, contracts_
     #print('Adding Data to Figure')
     #print(price_df['price'])
     #print(price_df['date_fullfillment'])
-    fig = go.Figure()
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
        
     # Plot the prices of the selected Futures on the y axis and the date of these prices on the y axis   
     dff = dates_ff  #all available closing dates of Futures
@@ -543,7 +556,7 @@ def display_price(dates_ff, harvest_area, harvest_tph, price_df_json, contracts_
             #print(f'selected futures: {selected_futures}')
             day_of_price_of_selected_futures = price_df[price_df['date_fullfillment']==future]['date_price']
             price_of_selected_futures= price_df['price']
-            fig.add_trace(go.Scatter(x=day_of_price_of_selected_futures, y=price_of_selected_futures, name=future, mode='lines+markers'))
+            fig.add_trace(go.Scatter(x=day_of_price_of_selected_futures, y=price_of_selected_futures, name=future, mode='lines+markers'), secondary_y=False,)
             fig.update_traces(marker=dict(colorscale='Agsunset'))
             print('Added future to figure')
         except:
@@ -556,7 +569,8 @@ def display_price(dates_ff, harvest_area, harvest_tph, price_df_json, contracts_
     
     try:    
         
-        fig.add_trace(go.Scatter(name="date/price closed", x=dates_of_closed_contracts, y=price_per_to_of_closed_contracts, mode='markers'))
+        fig.add_trace(go.Scatter(name="date/price closed", x=dates_of_closed_contracts, y=price_per_to_of_closed_contracts, mode='markers'), secondary_y=False, )
+        fig.update_yaxes(title_text="Future price and price of contracts in to", secondary_y=False)
         #fig.update_trace(marker=dict(colorscale='viridis'))
            
         print(f'Added to Contracts to Plot')
@@ -580,7 +594,8 @@ def display_price(dates_ff, harvest_area, harvest_tph, price_df_json, contracts_
         print(commodities_df.loc[commodities_df.index==2, 'next_harvest_date'])
         print(commodities_df['total_harvest'])
         fig.add_trace(go.Bar(x=commodities_df.loc[commodities_df.index==2, 'next_harvest_date'],
-             y=commodities_df.loc[commodities_df.index==2, 'total_harvest'], name='expected harvest'))
+             y=commodities_df.loc[commodities_df.index==2, 'total_harvest'], name='expected harvest'), secondary_y=True, )
+        fig.update_yaxes(title_text="contracted amount and expected harvest in to", secondary_y=True)
         print('added expected harvest plot')
     except:
         print("couldn't add expected harvest plot")
@@ -588,7 +603,7 @@ def display_price(dates_ff, harvest_area, harvest_tph, price_df_json, contracts_
     #Add contracted amount in to as barplot
     try:
         fig.add_trace(go.Bar( name='contracted amount', x=contracts_df["date_fullfillment"],
-             y=contracts_df["price_per_to"]))    
+             y=contracts_df["price_per_to"]), secondary_y=True)    
         print('added contracted amount in to')
     except:
         print("Error: couldn't add contracted amount in to")
@@ -601,7 +616,7 @@ def display_price(dates_ff, harvest_area, harvest_tph, price_df_json, contracts_
                   selector=dict(mode='markers'))
     
     #Add title
-    fig.update_layout(title_text="Wheat Future prices")
+    fig.update_layout(title_text="Future prices, contracted amount in to and GBP and expected harvest")
     
     
     #Add boxes to select time frame

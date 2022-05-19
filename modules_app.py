@@ -21,7 +21,7 @@ def load_dfs():
         print('loaded commodities')
 
 
-        contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contracts_id')
+        contracts_df = pd.read_sql('Select * FROM contracts', con)
         print(contracts_df)
         contracts_df_json= contracts_df.to_json(date_format='iso', orient='split')
         print('loaded contracts')
