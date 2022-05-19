@@ -1,4 +1,4 @@
-from dash import Dash, dcc, html, dash_table
+from dash import Dash, dcc, html, dash_table, ctx
 from dash.dependencies import Input, Output, State
 import pandas as pd
 from datetime import date, timedelta, datetime
@@ -6,6 +6,7 @@ import sqlite3
 import plotly.graph_objects as go
 import plotly.express as px
 from ModulScrapeWallstreet import scrape_futureprice, future_price_to_sql, extrapolate_data
+import json
 
 
 
@@ -30,7 +31,7 @@ colorscales = px.colors.named_colorscales()
 
 
 
-app = Dash(__name__, external_stylesheets=external_stylesheets)
+app = Dash(__name__, external_stylesheets=external_stylesheets, prevent_initial_callbacks=True)
 
 start_date=str(date.today())
 end_date=str(date.today() + timedelta(days=60))
@@ -44,6 +45,8 @@ app.layout = html.Div([
     html.Div(id='output-load_data'),
     html.Button('Load todays prices', n_clicks=0, id='button-scrape_data'),
     html.Div(id='output-scraped_data'),
+    html.Button('Save Data to DB', n_clicks=0, id='button_save_data'),
+    html.Div(id='output_save_data'),
         
     html.Div([
     
@@ -204,7 +207,16 @@ app.layout = html.Div([
         # [{"name": i, "id": i} for i in commodities_df.columns]
         # )
    
-    ])
+    ]),
+        
+        #Containers that store date when it is pushed from one function to the next:
+        dcc.Store(id='price_df_store'), #price_df
+        dcc.Store(id='commodities_df_store'), # commodities_df
+        dcc.Store(id='contracts_df_store'),
+        dcc.Store(id='future_price_today_store')
+        
+        
+        
         ], id='main_div'),
 ], id='app')
 
@@ -223,27 +235,104 @@ app.layout = html.Div([
 
 #Callbacks
 
-#Button load data
+#Callback that managed the load button and the scrape button behaviour
 
 @app.callback(Output('output-load_data', 'children'),
+              Output('output-scraped_data', 'children'),
               Output('commodity-dropdown', 'options'),
               Output('commodity-dropdown-delete', 'options'),
-              Output('future_dropdown_send', 'data'),
-    Input('button-load_data', 'n_clicks'))
-def load_data():
-    global commodities_df, contracts_df, price_df
-    print('Attempt to load commodites_df, contracts_df and price_df from sql database') 
-    try:
-        con = sqlite3.connect('contrcalc.db')
-        commodities_df = pd.read_sql("Select * from commodities", con, index_col='commodity_id')
-        contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contract_id',  parse_dates=['date_closure', 'date_fullfillment'])
-        price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
-        output_message = 'reloaded data: commodities_df, contracts_df, price_df'
-    except:
-        print("Error: couldn't reload data from database")
+              Output('price_df_store', 'data'),
+              Output('commodities_df_store', 'data'),
+              Output('contracts_df_store', 'data'),
+               
+                Input('button-load_data', 'n_clicks'),
+             Input('button-scrape_data', 'n_clicks'),
+             Input('price_df_store', 'data'),
+              Input('commodities_df_store', 'data'),
+              Input('contracts_df_store', 'data'))
+def load_scrape_data(click_load, click_scrape, price_df_json, commodities_df_json, contracts_df_json):
+    
+    
+    
+       
+    button_id = ctx.triggered_id if not None else 'No clicks yet'
+    print(button_id)
+    if button_id == 'button-load_data':
+        print('Attempt to load commodites_df, contracts_df and price_df from sql database') 
+        try:
+            con = sqlite3.connect('contrcalc.db')
+            commodities_df = pd.read_sql("Select * from commodities", con, index_col='commodity_id')
+            commodities_df_json = commodities_df.to_json(date_format='iso', orient='split')
+            print('loaded commodities')
+
+
+            contracts_df = pd.read_sql('Select * FROM contracts', con, index_col='contract_id',  parse_dates=['date_closure', 'date_fullfillment'])
+            contracts_df_json= contracts_df.to_json(date_format='iso', orient='split')
+            print('loaded contracts')
+
+
+            price_df = pd.read_sql('Select * FROM price_table', con, index_col='price_id')
+            price_df_json = price_df.to_json(date_format='iso', orient='split')
+            print('loaded prices')
+            output_message_load = 'reloaded data: commodities_df, contracts_df, price_df'
+            com_list = [com for com in commodities_df['name']]
+        except:
+            output_message_load = "Error: couldn't reload data from database"
+            print(output_message_load)
+            
         
-    com_list = [com for com in commodities_df['name']]
-    return output_message, com_list, com_list, json.dumps(price_df)
+    elif button_id == 'button-scrape_data':
+        print("Attempt to scrape future price data.")
+        price_df = pd.read_json(price_df_json, orient = 'split')
+        try:
+            future_df = scrape_futureprice()
+            future_df_clean = future_df[['commodity_id', 'date_fullfillment', 'date_price', 'price', 'currency']]
+            print('Scraped Wallstreet sucessfuly')
+            print(price_df, future_df_clean)
+        except:
+            print("Failed to scrape Wallstreet")
+        try:
+            price_df = pd.concat([price_df, future_df_clean], axis=0)
+            price_df.drop_duplicates(keep= 'first', inplace=True)
+            print(price_df, future_df_clean)
+            print(f'Successfully added scraped data to price_df.')
+        except: 
+            print('Error: Could not add scraped data to price_df')
+        
+    else:
+        output_message_load = ''
+        output_message_scrape = ''
+        com_list = []
+    
+    if 'output_message_scrape' not in locals():
+        output_message_scrape = ''
+    if 'output_message_load' not in locals(): 
+        output_message_load =''
+    if 'com_list' not in locals(): 
+        com_list =[]
+    if 'price_df_json' not in locals():
+        price_df = pd.read_json(price_df_json, orient = 'split')
+    if  'commodities_df_json' not in locals():
+        commodities_df = pd.read_json(commodities_df_json, orient = 'split')
+    if 'contracts_df_json' not in locals():
+        contracts_df = pd.read_json(contracts_df_json, orient = 'split')
+        
+    return output_message_load, output_message_scrape, com_list, com_list, price_df_json, commodities_df_json, contracts_df_json    
+
+
+
+
+#Button save data to database
+@app.callback(Output('output_save_data', 'children'),
+             Input('price_df_store', 'data'),
+             Input('contracts_df_store', 'data'),
+              Input('commodities_df_store', 'data'),
+             Input('future_price_today_store', 'data'))
+def save_to_db(price_df_json, contracts_df_json, commodities_df_json, future_price_today_store):
+    output_message = 'this button does nothing'
+    return output_message
+    
+    
 
 
 
@@ -255,23 +344,7 @@ def load_data():
 
 #Button load todays prices:
 
-@app.callback(Output('output-scraped_data', 'children'),
-              Input('button-scrape_data', 'n_clicks'))
-def scrape_data(n_clicks):
-    print("Attempt to scrape future price data.")
-    try:
-        future_price_today = scrape_futureprice()
-        print('Scraped Wallstreet sucessfuly')
-    except:
-        print("Failed to scrape Wallstreet")
-    try:
-        tosql_df = future_price_to_sql(future_price_today)
-        print(f'Successfully parsed data to database price_table. Parsed data: {tosql_df}')
-    except: 
-        print('Error: Could not parse data to database price_table')
-    finally:
-        output_message = "Scraped Price data successfully"
-    return output_message
+
 
 
 # Changing tab:
@@ -339,12 +412,14 @@ def save_expected_harvest(harvest_area, harvest_tph):
 #toggle tropdown to select futures:
 @app.callback(Output('date_fullfillment-dropdown', 'options'),
               Output('date_fullfillment-dropdown', 'value'),
-             Input('future_dropdown_send', 'data'))
-def toggle_futures_dropdown(json_price_df):
-    price_df = json.loads(json_price_df)
+             Input('price_df_store', 'data'),
+             Input('commodities_df_store', 'data'))
+def toggle_futures_dropdown(json_price_df, json_commodities_df):
+    price_df = pd.read_json(json_price_df, orient = 'split')
+    commodities_df = pd.read_json(json_commodities_df, orient = 'split')
     fullfillment_options = [datefull for datefull in price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()]
-    fullfillment_value = price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()
-    return fullfillment_dates, fullfillment_value
+    fullfillment_value = price_df[price_df['commodity_id']==2]['date_fullfillment'].unique().max()
+    return fullfillment_options, fullfillment_value
 
 
 
@@ -356,61 +431,73 @@ def toggle_futures_dropdown(json_price_df):
 
 #Delete Contract
 @app.callback(Output('delete-button', 'children'),
-            Input('button-delete-contract-state', 'n_clicks'),
+              Input('button-delete-contract-state', 'n_clicks'),
+              Input('contracts_df_store', 'data'),
+            
+              Input('commodities_df_store', 'data'),
               State('commodity-dropdown-delete', 'value'),
               State('input-price-delete', 'value'),
               State('input-amount-delete', 'value'),
               State('input-date_fullfillment-delete', 'date'),
               State('input-date_contract-delete', 'date')
              )           
-def delete_contract(n_clicks, commodity, price, amount, date_fullfillment, date_contract):
-    global contracts_df
-    contract_commodity_id = commodities_df[commodities_df['name']==commodity].index  #The id of the commodity that is the subject of the contract  
-    contract = pd.DataFrame({'commodity_id': contract_commodity_id, 'price_per_to': price, 'amount_to': amount, 'date_fullfillment':date_fullfillment, 'date_closure':date_contract}, index=[0])
-    contracts_df = pd.concat([contracts_df, contract], axis = 0)
+def delete_contract(n_clicks, contracts_df_json, commodities_df_json, commodity, price, amount, date_fullfillment, date_contract):
+    contracts_df = pd.read_json(contracts_df_json, orient='split')
+    commodities_df = pd.read_json(commodities_df_json, orient='split')
     
-    print(f'Attempt to delete contract: {contract_commodity_id, price, amount, date_fullfillment, date_contract}')
-    querry = """
-    SELECT * FROM contracts
-        WHERE (price_per_to = :price)"""
-    #sends the new contract to sql:
-    output = 'Select features of contract to delete.'
-    try:
-        if price:
-            print(f'Connecting to db to collect contract')
+    if not commodity or not price or not amount or not date_fullfillment or not date:
+        output = 'Define all features to delete contract'
+    else:     
+        contract_commodity_id = commodities_df[commodities_df['name']==commodity].index  #The id of the commodity that is the subject of the contract  
+
+        print(contract_commodity_id)
+        contract = pd.DataFrame({'commodity_id': contract_commodity_id, 'price_per_to': price, 'amount_to': amount, 'date_fullfillment':date_fullfillment, 'date_closure':date_contract}, index=[0])
+        contracts_df = pd.concat([contracts_df, contract], axis = 0)
+
+        print(f'Attempt to delete contract: {contract_commodity_id, price, amount, date_fullfillment, date_contract}')
+        querry = """
+        SELECT * FROM contracts
+            WHERE (price_per_to = :price)"""
+        #sends the new contract to sql:
+        output = 'Select features of contract to delete.'
+        try:
+            if price:
+                print(f'Connecting to db to collect contract')
+                con = sqlite3.connect('contrcalc.db')
+                to_delete = pd.read_sql(querry, con, params = {'price':price})
+                output = f'Do you want to delete this contract? {to_delete}'
+
+                #print(f'Contract saved: n_clicks:{n_clicks}, commodity:{commodity}, price:{price}, amount:{amount}, date_fullfillment:{date_fullfillment}, date_contract:{date_contract}')
+            else:
+                print('No contract selected, some input is not clear.')
+                pass
+        except:
+            print('Failed to select a contract from database')
+
+        try:
+            print('Deleting contracts')
             con = sqlite3.connect('contrcalc.db')
-            to_delete = pd.read_sql(querry, con, params = {'price':price})
-            output = f'Do you want to delete this contract? {to_delete}'
-            
-            #print(f'Contract saved: n_clicks:{n_clicks}, commodity:{commodity}, price:{price}, amount:{amount}, date_fullfillment:{date_fullfillment}, date_contract:{date_contract}')
-        else:
-            print('No contract selected, some input is not clear.')
-            pass
-    except:
-        print('Failed to select a contract from database')
-    
-    try:
-        print('Deleting contracts')
-        con = sqlite3.connect('contrcalc.db')
-        cur = con.cursor()
-        cur.execute(""" DELETE FROM contracts
-                                WHERE ( 
-                                price_per_to = :price
-                                AND amount_to = :amount
-                                AND date_fullfillment = :date_ff
-                                AND date_closure = :date_c
-                                )
-            """, {"contract_commodity_id": contract_commodity_id, 'price': price, 'amount': amount, 'date_ff': date_fullfillment, 'date_c':date_contract})
-        con.close()
-        output += 'Contract deleted'
-    except: 
-        print('Something went wrong while trying to delte contract')
+            cur = con.cursor()
+            cur.execute(""" DELETE FROM contracts
+                                    WHERE ( 
+                                    price_per_to = :price
+                                    AND amount_to = :amount
+                                    AND date_fullfillment = :date_ff
+                                    AND date_closure = :date_c
+                                    )
+                """, {"contract_commodity_id": contract_commodity_id, 'price': price, 'amount': amount, 'date_ff': date_fullfillment, 'date_c':date_contract})
+            con.close()
+            output += 'Contract deleted'
+        except: 
+            print('Something went wrong while trying to delte contract')
     return output
 
 
 #Add Contract
            
 @app.callback(Output('output-container-button', 'children'),
+              Input('commodities_df_store', 'data'),
+              Input('contracts_df_store', 'data'),
             Input('button-enter-contract-state', 'n_clicks'),
               State('commodity-dropdown', 'value'),
               State('input-price', 'value'),
@@ -418,25 +505,33 @@ def delete_contract(n_clicks, commodity, price, amount, date_fullfillment, date_
               State('input-date_fullfillment', 'date'),
               State('input-date_contract', 'date')
              )
-def add_contract(n_clicks, commodity, price, amount, date_fullfillment, date_contract):
-    global contracts_df
-    print('Attempt to add contract')
-    contract_commodity_id = commodities_df[commodities_df['name']==commodity].index  #The id of the commodity that the is the subject of the contract  
-    contract = pd.DataFrame({'commodity_id': contract_commodity_id, 'price_per_to': price, 'amount_to': amount, 'date_fullfillment':date_fullfillment, 'date_closure':date_contract}, index=[0])
-    contracts_df = pd.concat([contracts_df, contract], axis = 0)
+def add_contract(commodities_df_json, contracts_df_json, n_clicks, commodity, price, amount, date_fullfillment, date_contract):
+    commodities_df = pd.read_json(commodities_df_json, orient='split')
+    contracts_df = pd.read_json(contracts_df_json, orient='split')
     
-    #sends the new contract to sql:
-    try:
-        if price:
-            con = sqlite3.connect('contrcalc.db')
-            contract.to_sql('contracts', con, if_exists='append', index=False)
-            output_message = f'Contract saved: n_clicks:{n_clicks}, commodity:{commodity}, price:{price}, amount:{amount}, date_fullfillment:{date_fullfillment}, date_contract:{date_contract}'
-        else:
-            output_message = 'No contract added because, price is empty.'
-            pass
-    except:
-        output_message = 'Failed to send the dataframe to the database'
+    if not commodity or not price or not amount or not date_fullfillment or not date:
+        output_message = 'Define all features to add contract'
+    else:     
     
+        print('Attempt to add contract', commodity)
+        contract_commodity_id = commodities_df[commodities_df['name']==commodity].index  #The id of the commodity that the is the subject of the contract  
+
+        print(contract_commodity_id)
+        contract = pd.DataFrame({'commodity_id': contract_commodity_id, 'price_per_to': price, 'amount_to': amount, 'date_fullfillment':date_fullfillment, 'date_closure':date_contract}, index=[0])
+        contracts_df = pd.concat([contracts_df, contract], axis = 0)
+
+        #sends the new contract to sql:
+        try:
+            if price:
+                con = sqlite3.connect('contrcalc.db')
+                contract.to_sql('contracts', con, if_exists='append', index=False)
+                output_message = f'Contract saved: n_clicks:{n_clicks}, commodity:{commodity}, price:{price}, amount:{amount}, date_fullfillment:{date_fullfillment}, date_contract:{date_contract}'
+            else:
+                output_message = 'No contract added because, price is empty.'
+                pass
+        except:
+            output_message = 'Failed to send the dataframe to the database'
+
     return output_message
 
 
@@ -446,25 +541,31 @@ def add_contract(n_clicks, commodity, price, amount, date_fullfillment, date_con
 
 #Display only price data that was selected in Dropdown
 @app.callback(Output('price_dev', 'figure'),
-             Input('date_fulllfillment-dropdown', 'value'),
+             Input('date_fullfillment-dropdown', 'value'),
              Input("input_hectar_wheat", "value"), 
-              Input("input_harvest_per_ha_wheat", "value"))
-def display_price(dates_ff, harvest_area, harvest_tph):
-    print('Adding Data to Figure')
+              Input("input_harvest_per_ha_wheat", "value"),
+             Input("price_df_store", "data"),
+             Input("contracts_df_store", "data"),
+             Input("commodities_df_store", "data"))
+def display_price(dates_ff, harvest_area, harvest_tph, price_df_json, contracts_df_json, commodities_df_json):
+    commodities_df = pd.read_json(commodities_df_json, orient='split')
+    contracts_df = pd.read_json(contracts_df_json, orient='split')
+    price_df = pd.read_json(price_df_json, orient='split')
+    #print('Adding Data to Figure')
     #print(price_df['price'])
-    print(price_df['date_fullfillment'])
+    #print(price_df['date_fullfillment'])
     fig = go.Figure()
        
     # Plot the prices of the selected Futures on the y axis and the date of these prices on the y axis   
     dff = dates_ff  #all available closing dates of Futures
-    print(f'Available closing dates: {dff}')
+    #print(f'Available closing dates: {dff}')
     for index, future in enumerate(dff):
-        print(f'Future to add to figure: {index, future}')
+        #print(f'Future to add to figure: {index, future}')
         try:
             fullfill_series = price_df['date_fullfillment'] #
-            print(f'All fullfillment dates in price_df: {fullfill_series}')
+            #print(f'All fullfillment dates in price_df: {fullfill_series}')
             #print(fullfill_series.isin(future))
-            #selected_futures = fullfill_series[future] # series of the values that where selected in 'date_fulllfillment-dropdown' (fullfillment dates of Futures)
+            #selected_futures = fullfill_series[future] # series of the values that where selected in 'date_fullfillment-dropdown' (fullfillment dates of Futures)
             #print(f'selected futures: {selected_futures}')
             day_of_price_of_selected_futures = price_df[price_df['date_fullfillment']==future]['date_price']
             price_of_selected_futures= price_df['price']
@@ -478,7 +579,7 @@ def display_price(dates_ff, harvest_area, harvest_tph):
     price_per_to_of_closed_contracts = contracts_df['price_per_to']
     dates_of_closed_contracts = contracts_df['date_closure']
     fullfillment_dates_of_contracts = contracts_df['date_fullfillment']
-    print(fullfillment_dates_of_contracts)
+    
     try:    
         
         fig.add_trace(go.Scatter(name="date/price closed", x=dates_of_closed_contracts, y=price_per_to_of_closed_contracts, mode='markers'))
@@ -559,6 +660,17 @@ def display_price(dates_ff, harvest_area, harvest_tph):
 )
     return fig
 
+
+
+# #Manage dataflow to price_df_store, commodities_df_store and contracts_df_store
+# @app.callback(Output('price_df_store', 'data'),
+#              Output('commodities_df_store', 'data'),
+#              Output('contracts_df_store'),
+#              Input(),
+#              Input(),
+#              Input(),)
+# def manage_data_store():
+#     return
 
 
 
