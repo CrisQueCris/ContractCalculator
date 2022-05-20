@@ -6,8 +6,10 @@ How to run the app:
 
 
 Main Module: app.py
+app modules: modules_app.py
 Scraping: ModulScrapeWallstreet.py
 Database: contrcalc.db
+initialise and populate database: init.py
 
 About:
 # ContractCalculator

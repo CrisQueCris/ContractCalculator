@@ -22,11 +22,13 @@ def scrape_futureprice():
     
     ## Table to Dateframe
     future_price_today = pd.DataFrame(columns=['Kontrakt', 'letzer_kurs', 'absolut', 'perf_perc', 'Fälligkeit', 'Vergleich', 'date_scraped'])
+    print(soup)
     try:
-        for i in soup.select('div:nth-child(11) > table > tbody >tr'): #extrakt tablerows
+        for i in soup.select('div:nth-child(10) > table > tbody >tr'): #extrakt tablerows
             row = []
             for j in i.select('td'): # extract table data of rows
                 row.append(j.get_text())
+                print(f'row: {row}')
             row.append(date.today() - timedelta(days=1))
             ser = pd.Series(row, index=['Kontrakt', 'letzer_kurs', 'absolut', 'perf_perc', 'Fälligkeit', 'Vergleich', 'date_scraped'])
             

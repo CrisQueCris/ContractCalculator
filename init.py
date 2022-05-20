@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import os.path
+from datetime import date
 
 # 
 
@@ -149,5 +150,32 @@ def simulate_price_data():
     # future_df 
     return
 
+
+
+def populate_prices():
+    '''stores wheat_df in database price_table'''
+    wheat_df = pd.read_csv('wheat_df')
+    price = wheat_df['price']
+    date_price = wheat_df['date']
+    price_id = wheat_df['Unnamed: 0']
+    date_fullfillment = date.today()
+    currency = 'GBP'
+    commodity_id = 2
+    fake_prices = {'price_id':price_id, 'commodity_id':commodity_id, 'date_fullfillment':date_fullfillment, 'date_price':date_price, 'price':price, 'currency':currency}
+    price_table_df = pd.DataFrame(fake_prices)
+    try:
+        con = sqlite3.connect('contrcalc.db')
+        print('connected to db')
+
+        price_table_df.to_sql('price_table', con, if_exists='replace', index=False, index_label='price_id')
+        print('price_df stored to db')
+
+        output_message = 'Sucessfuly saved to db'
+        print(output_message)
+    except:
+        output_message = 'Failed to store to db'
+    return output_message
+
 init_db()
 populate_commodities()
+populate_prices()
