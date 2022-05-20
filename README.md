@@ -1,3 +1,8 @@
+![Screenshot](screenshot.PNG)
+
+
+
+
 How to run the app:
 
 1. run python app.py
