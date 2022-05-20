@@ -313,7 +313,7 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
             future_df = scrape_futureprice()
             future_df_clean = future_df[['commodity_id', 'date_fullfillment', 'date_price', 'price', 'currency']]
             print('Scraped Wallstreet sucessfuly')
-            print(price_df, future_df_clean)
+            print(f'price_df:{price_df}, futre_df_clean:{future_df_clean}')
         except:
             print("Failed to scrape Wallstreet")
         try:
@@ -324,7 +324,7 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
             print(price_df, future_df_clean)
             price_df = pd.concat([price_df, future_df_clean], axis=0)
             print(price_df)
-            price_df.drop_duplicates(keep= 'first', inplace=True)
+            price_df.drop_duplicates(subset= ('commodity_id', 'date_fullfillment', 'date_price', 'price', 'currency'), keep= 'first', inplace=True)
             print(price_df)
             price_df_json = price_df.to_json(date_format='iso', orient='split')
             print(price_df, future_df_clean)
@@ -430,15 +430,7 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
                 print('stored harvest data in commodities_df')
                 output_hectar_wheat = f'{wheat_area}ha, press save'
                 output_to_wheat = f'{wheat_to_per_ha}to/ha, press save'
-#                 con = sqlite3.connect('contrcalc.db')
-                
-                
-#                 print('Connecting to Database to save')
-#                 con = sqlite3.connect('contrcalc.db')
-                    
-#                 commodities_df.to_sql('commodities', con, if_exists='replace', index_label='commodity_id')
-#                 print('commodities_df stored to db')
-                
+
                 
                 
             except:
@@ -558,16 +550,21 @@ def plot_futures_contracts_harvest(dates_ff, harvest_area, harvest_tph, price_df
     #print(f'Available closing dates: {dff}')
     price_df['date_fullfillment']= pd.to_datetime(price_df['date_fullfillment'], format='%Y/%m/%d %H:%M:%S').dt.date
     price_df['date_price']= pd.to_datetime(price_df['date_price'], format='%Y/%m/%d %H:%M:%S')#.dt.date
-    
-    
-    
- 
-        
+    dff =pd.DataFrame(dff, columns=['dff'])
+    print('1',dff)
+    dff =pd.to_datetime(dff['dff'], format='%Y/%m/%d')  
+    print('2', dff)
+    #for i in price_df['date_fullfillment'].unique():
+    fig.add_trace(go.Scatter(x=price_df['date_price'], y=price_df['price'], mode='lines+markers', name='price'), secondary_y=False)
+    fig.update_traces(marker=dict(colorscale='Agsunset'))
+    #, name = str(price_df['date_fullfillment'][i].strftime('%Y-%m')
     try:
-        for i, __ in enumerate(dff):
-            print(i)
-            fig.add_trace(go.Scatter(x=[price_df['date_price'][i].strftime("%Y-%m-%d")], y=[price_df['price'][i]], mode='lines+markers', name = price_df['date_fullfillment'][i].strftime("%m-%Y")), secondary_y=False)
-        fig.update_traces(marker=dict(colorscale='Agsunset'))
+        for date_selected in dff.iloc[:,'dff']:
+            print(date_selected)
+            #print('dff', dff)    
+            print(price_df['date_price'])
+            print(price_df[price_df['date_fullfillment']==date_selected]['price'])
+        
         print('Added future to figure')
     except:
         print('Could not add future to figure')
