@@ -1,7 +1,6 @@
 ![Screenshot](screenshot.PNG)
 
-
-
+(presentation)(https://docs.google.com/presentation/d/1tdil64aRx2Ez0cokOzLCVFRTTx3VJ1D70wsm8FnbDTc/edit#slide=id.g12c74ec3377_0_151)
 
 How to run the app:
 
