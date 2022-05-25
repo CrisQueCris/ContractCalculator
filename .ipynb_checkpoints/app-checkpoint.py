@@ -475,36 +475,12 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
 
 
 
-
-
-
-#Button load todays prices:
-
-
-
-
 # Changing tab:
 
 #@app.callback(Output('tabs-content', 'children'),
 #             Input('commodities-tab', 'value'))
 #def render_commodity(tab):
 #    return tab
-
-
-# Changing date range:
-#@app.callback(Output('rangeslider_time', 'value'[1]),
-#              Input('date-picker-range', 'start_date'),
-#             Input('date-picker-range', 'end_date'))
-#def date_to_slider(start_date, end_date):
-#    #print(start_date, end_date)
-#    #start_data =int(start_date)
-#    #end_date = datetime.strptime(end_date, '%Y-%m-%d')
-#    return start_date, end_date
-
-
-
-
-
 
 
 
@@ -514,11 +490,11 @@ def load_scrape_save_data(click_load, click_scrape, click_save, click_enter, cli
               Output('date_fullfillment-dropdown', 'value'),
              Input('price_df_store', 'data'),
              Input('commodities_df_store', 'data'))
-def toggle_futures_dropdown(json_price_df, json_commodities_df):
-    price_df = pd.read_json(json_price_df, orient = 'split')
-    commodities_df = pd.read_json(json_commodities_df, orient = 'split')
-    fullfillment_options = [datefull for datefull in price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()]
-    fullfillment_value = price_df[price_df['commodity_id']==2]['date_fullfillment'].unique()
+def toggle_futures_dropdown(price_df_json, commodities_df_json):
+    price_df = pd.read_json(price_df_json, orient = 'split')
+    commodities_df = pd.read_json(commodities_df_json, orient = 'split')
+    fullfillment_options = pd.to_datetime(price_df[price_df['commodity_id']==2]['date_fullfillment'], format='%Y/%m/%d').dt.date.unique().tolist()
+    fullfillment_value = sorted(pd.to_datetime(price_df[price_df['commodity_id']==2]['date_fullfillment'], format='%Y/%m/%d').dt.date.unique().tolist())[0:2]
     return fullfillment_options, fullfillment_value
   
 
@@ -535,8 +511,7 @@ def toggle_futures_dropdown(json_price_df, json_commodities_df):
              Input("contracts_df_store", "data"),
              Input("commodities_df_store", "data"))
 def plot_futures_contracts_harvest(dates_ff, harvest_area, harvest_tph, price_df_json, contracts_df_json, commodities_df_json):
-    
-    
+        
     commodities_df = pd.read_json(commodities_df_json, orient='split')
     contracts_df = pd.read_json(contracts_df_json, orient='split')
     price_df = pd.read_json(price_df_json, orient='split')
@@ -546,28 +521,28 @@ def plot_futures_contracts_harvest(dates_ff, harvest_area, harvest_tph, price_df
     fig = make_subplots(specs=[[{"secondary_y": True}]])
        
     # Plot the prices of the selected Futures on the y axis and the date of these prices on the y axis   
-    dff = dates_ff  #all available closing dates of Futures
+    selected_futures_dates = dates_ff  #all available closing dates of Futures
     #print(f'Available closing dates: {dff}')
     price_df['date_fullfillment']= pd.to_datetime(price_df['date_fullfillment'], format='%Y/%m/%d %H:%M:%S').dt.date
-    price_df['date_price']= pd.to_datetime(price_df['date_price'], format='%Y/%m/%d %H:%M:%S')#.dt.date
-    dff =pd.DataFrame(dff, columns=['dff'])
-    print('1',dff)
-    dff =pd.to_datetime(dff['dff'], format='%Y/%m/%d')  
-    print('2', dff)
-    #for i in price_df['date_fullfillment'].unique():
-    fig.add_trace(go.Scatter(x=price_df['date_price'], y=price_df['price'], mode='lines+markers', name='price'), secondary_y=False)
-    fig.update_traces(marker=dict(colorscale='Agsunset'))
-    #, name = str(price_df['date_fullfillment'][i].strftime('%Y-%m')
+    price_df['date_price']= pd.to_datetime(price_df['date_price'], format='%Y/%m/%d %H:%M:%S').dt.date
+    selected_futures_dates_df =pd.DataFrame(selected_futures_dates, columns=['dates_fullfillment'])
+    
+    selected_futures_dates_df['dates_fullfillment'] =pd.to_datetime(selected_futures_dates_df['dates_fullfillment'], format='%Y/%m/%d %H:%M:%S').dt.date  
+    
     try:
-        for date_selected in dff.iloc[:,'dff']:
-            print(date_selected)
-            #print('dff', dff)    
-            print(price_df['date_price'])
-            print(price_df[price_df['date_fullfillment']==date_selected]['price'])
         
-        print('Added future to figure')
+        for date_fullfillment in selected_futures_dates_df['dates_fullfillment']:
+            print(f'plotting future with fullfillment date:{date_fullfillment}')
+            fig.add_trace(go.Scatter(x=price_df[price_df['date_fullfillment']==date_fullfillment]['date_price'],\
+                                     y=price_df[price_df['date_fullfillment']==date_fullfillment]['price'],\
+                                     mode='lines+markers', name=f'fullfill until: {date_fullfillment}'),\
+                          secondary_y=False)
+            fig.update_traces(marker=dict(colorscale='Agsunset'))
+        print('Succesfully ploted future price data')
     except:
-        print('Could not add future to figure')
+        print("Error: Couldn't plot future price data")
+
+    
     
     #Plot the prices per to of closed contracts on the y axis and the dates of closure on the x axis as points
     price_per_to_of_closed_contracts = contracts_df['price_per_to']
@@ -580,44 +555,48 @@ def plot_futures_contracts_harvest(dates_ff, harvest_area, harvest_tph, price_df
         fig.update_yaxes(title_text="Future price and price of contracts in to", secondary_y=False)
         #fig.update_trace(marker=dict(colorscale='viridis'))
            
-        print(f'Added to Contracts to Plot')
+        print(f'Added contracts to Plot')
     except:
-        print('Failed to add dates_of_closed_contract and price_per_to_of_closed_contractst to figure')
+        print('Failed to add dates_of_closed_contract and price_per_to_of_closed_contracts to figure')
         
-   
+   #Add contracted amount in to as barplot
+    try:
+        fig.add_trace(go.Bar( name='contracted amount', x=contracts_df["date_fullfillment"],
+             y=contracts_df["amount_to"], text=contracts_df["amount_to"]), secondary_y=True)    
+        print('added contracted amount in to')
+    except:
+        print("Error: couldn't add contracted amount in to")
+    fig.update_yaxes(title_text="contracted amount and expected harvest in to", secondary_y=True)
+
     
     
     
-    
-    #add column total harvest
-    commodities_df['total_harvest']= commodities_df['estimate_harvest_to']*commodities_df['area_planted']
-    
-    #add next_harvest_date as daytetime 
+    #add next_harvest_date as daytime 
     commodities_df['next_harvest_date'] = [datetime.strptime(f'2022/{month}/01', "%Y/%m/%d") for month in commodities_df['harvest_month']]
-    print(commodities_df['next_harvest_date'].info())
+    commodities_df['next_harvest_date']
     
     
     #Add expected harvest barplot
     try:
         print(commodities_df.loc[commodities_df.index==2, 'next_harvest_date'])
-        print(commodities_df['total_harvest'])
-        fig.add_trace(go.Bar(x=commodities_df.loc[commodities_df.index==2, 'next_harvest_date'],
-             y=commodities_df.loc[commodities_df.index==2, 'total_harvest'], name='expected harvest', text=commodities_df.loc[commodities_df.index==2, 'total_harvest']), secondary_y=True, )
-        fig.update_yaxes(title_text="contracted amount and expected harvest in to", secondary_y=True)
+        total_harvest_in_to = harvest_area*harvest_tph
+        print(harvest_area*harvest_tph)
         
-        fig.add_hline(y=(harvest_area* harvest_tph*0.30))
-        fig.add_hrect(y0=(harvest_area*harvest_tph*0.30), y1=harvest_area*harvest_tph, line_width=0, fillcolor="red", opacity=0.2)
+        fig.add_trace(go.Bar(x=commodities_df.loc[commodities_df.index==2, 'next_harvest_date'],\
+             y=[total_harvest_in_to], name='expected harvest', text=total_harvest_in_to), secondary_y=True, )
+        
+        
+        
+        
+        fig.add_hline(y=(harvest_area* harvest_tph*0.30), secondary_y=True,\
+                     annotation_text="30% of total harvest", 
+              annotation_position="bottom right",) #30% of total harvest
+        fig.add_hrect(y0=(harvest_area*harvest_tph*0.30), y1=harvest_area*harvest_tph, line_width=0, fillcolor="red", opacity=0.2, secondary_y=True,) #red square above 30 percent of harvest
         print('added expected harvest plot')
     except:
         print("couldn't add expected harvest plot")
     
-    #Add contracted amount in to as barplot
-    try:
-        fig.add_trace(go.Bar( name='contracted amount', x=contracts_df["date_fullfillment"],
-             y=contracts_df["price_per_to"], text=contracts_df["price_per_to"]), secondary_y=True)    
-        print('added contracted amount in to')
-    except:
-        print("Error: couldn't add contracted amount in to")
+    
     
     
     #Add marker styling 
@@ -662,7 +641,6 @@ def plot_futures_contracts_harvest(dates_ff, harvest_area, harvest_tph, price_df
     )
 )
     return fig
-
 
 
 # #Manage dataflow to price_df_store, commodities_df_store and contracts_df_store
